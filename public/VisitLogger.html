@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Executive Visit Logger</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
+  
+
+  <style>
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background-color: #f4f6f8;
+  color: #333;
+}
+
+/* ✅ Main Layout */
+.container {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 30px;
+  padding: 40px;
+  max-width: 1200px;
+  margin: auto;
+}
+
+/* ✅ Panels */
+.panel {
+  background: #fff;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  animation: panelFade 0.4s ease-in-out;
+}
+
+/* ✅ Fade animation */
+@keyframes panelFade {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+h2 {
+  margin-top: 0;
+  font-weight: 600;
+  font-size: 22px;
+  margin-bottom: 20px;
+}
+
+label {
+  display: block;
+  margin-top: 15px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* ✅ Form elements */
+select,
+input[type="time"] {
+  width: 100%;
+  padding: 10px;
+  margin-top: 6px;
+  font-size: 15px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  transition: box-shadow 0.2s;
+}
+
+select:focus,
+input:focus {
+  box-shadow: 0 0 0 2px #0078D4;
+  outline: none;
+}
+
+/* ✅ Buttons */
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.button-row button {
+  flex: 0 0 auto; /* ✅ keeps natural width */
+  min-width: 130px;
+  max-width: 180px;
+  padding: 10px 14px;
+  font-size: 14px;
+  border: none;
+  border-radius: 6px;
+  background-color: #0078D4;
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.button-row button:hover {
+  background-color: #005ea2;
+  transform: scale(1.03);
+}
+
+/* ✅ MOBILE FIX */
+@media (max-width: 600px) {
+  .button-row {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .button-row button {
+    min-width: 45%;
+    max-width: 200px;
+    font-size: 15px;
+    padding: 12px;
+  }
+}
+
+
+button:hover {
+  background-color: #005ea2;
+  transform: scale(1.05);
+}
+
+button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #0078D4;
+}
+
+/* ✅ Filters Section */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.filters select {
+  flex: 1;
+  min-width: 120px;
+}
+
+/* ✅ Tables */
+#reportTable {
+  max-height: 400px;
+  overflow-y: auto;
+  display: block;
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 700px; /* allows horizontal scroll */
+}
+
+th,
+td {
+  border: 1px solid #ddd;
+  padding: 6px;
+  text-align: center;
+}
+
+th {
+  background-color: #f0f0f0;
+  position: sticky;
+  top: 0;
+}
+
+/* ✅ Top bar responsiveness */
+.top-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  background: #0078D4;
+  color: white;
+  padding: 10px;
+}
+
+.top-bar > * {
+  margin: 5px;
+}
+
+/* ✅ Dropdown */
+.dropdown {
+  position: relative;
+  display: inline-block;
+  margin-left: 20px;
+}
+
+.dropbtn {
+  background-color: #fff;
+  color: #0078D4;
+  padding: 10px 16px;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #f9fbfc;
+  min-width: 240px;
+  max-width: 350px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  z-index: 1;
+  border-radius: 6px;
+  padding: 10px;
+  top: 100%;
+  left: 0;
+}
+
+.dropdown-content a {
+  color: #0078D4;
+  padding: 8px 12px;
+  text-decoration: none;
+  display: block;
+  font-size: 13px;
+}
+
+.dropdown-content a:hover {
+  background-color: #e6f0ff;
+}
+
+.dropdown:hover .dropdown-content {
+  display: block;
+}
+
+/* ✅ MOBILE FIXES */
+@media (max-width: 900px) {
+  .container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px;
+  }
+}
+
+@media (max-width: 600px) {
+  body {
+    background: #f7f9fa;
+  }
+
+  h2 {
+    font-size: 18px;
+  }
+
+  .container {
+    padding: 10px;
+  }
+
+  .panel {
+    padding: 20px;
+  }
+
+  select, input, button {
+    font-size: 16px;
+  }
+
+  .button-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  #reportTable {
+    overflow-x: auto;
+  }
+
+  table {
+    font-size: 12px;
+    min-width: 600px; /* ✅ scrolls horizontally on small screens */
+  }
+
+  .top-bar {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .top-bar button,
+  .dropbtn,
+  #timestamp {
+    width: 100%;
+    max-width: 320px;
+    margin: 5px 0;
+  }
+}
+button {
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+  </style>
+</head>
+<body>
+<div style="background:#0078D4; color:white; padding:05px; display:flex; justify-content:flex-start; gap:20px;">
+  <div class="dropdown">
+    <button class="dropbtn">📅 Past 7 Days</button>
+    <div class="dropdown-content" id="historyDropdown"></div>
+  </div>
+  
+  <div style="flex:1; text-align:center;">
+  <button onclick="resetLogs()" style="
+    background:#d9534f;
+    color:white;
+    padding:8px 16px;
+    font-size:14px;
+    border:none;
+    border-radius:4px;
+    cursor:pointer;
+  ">
+    Reset Today's Logs
+  </button>
+</div>
+
+  <div id="timestamp" style="margin-left:auto; font-size:15	px; color:#fff;"></div>
+</div>
+
+  <div class="container">
+    <!-- Left Panel: Logging Form -->
+    <div class="panel">
+      <h2>Log Executive Visit</h2>
+      <label for="employee">Executive Name</label>
+      <select id="employee">
+        <option value="" disabled selected>-- Select Executive --</option>
+      </select>
+
+      <label for="visitType">Visit Type</label>
+      <select id="visitType">
+        <option value="" disabled selected>-- Select Visit Type --</option>
+        <option value="CD3">CD3</option>
+        <option value="CD5">CD5</option>
+        <option value="CD7">CD7</option>
+        <option value="YB">YB</option>
+        <option value="MIS">MIS</option>
+      </select>
+
+      <label for="visitTime">Visit Time</label>
+      <input type="time" id="visitTime">
+
+      <div class="button-row" style="text-align:center; margin-top:20px;">
+        <button onclick="logVisit()">Submit</button>
+		<button onclick="createNewFile()">Start New File</button>
+      </div>	
+<div class="button-row" style="text-align:center; margin-top:50px;">
+  <button onclick="addExecutive()" style="background-color:#28a745;">➕ Add Executive</button>
+  <button onclick="removeExecutive()" style="background-color:#dc3545;">➖ Remove Executive</button>
+</div>
+    </div>
+    <!-- Right Panel: Filters + Report -->
+    <div class="panel">
+      <h2>Visit Report</h2>
+      <div class="filters">
+        <select id="filterExecutive">
+          <option value="">-- Filter by Executive --</option>
+        </select>
+        <select id="filterType">
+          <option value="">-- Filter by Type --</option>
+          <option value="CD3">CD3</option>
+          <option value="CD5">CD5</option>
+          <option value="CD7">CD7</option>
+          <option value="YB">YB</option>
+          <option value="MIS">MIS</option>
+        </select>
+        <select id="filterTime">
+          <option value="">-- Filter by Time --</option>
+          <option value="morning">Morning</option>
+          <option value="afternoon">Afternoon</option>
+        </select>
+      </div>
+      <div class="button-row">
+        <button onclick="applyFilters()">Apply Filters</button>
+        <button onclick="downloadReport()">Download EXCEL</button>
+        <button onclick="viewReport()">Refresh</button>
+      </div>
+      <div id="reportTable"></div>
+    </div>
+  </div>
+  <script>
+  async function loadExecutives() {
+    const res = await fetch("/executives");
+    const names = await res.json();
+    const dropdowns = [document.getElementById("employee"), document.getElementById("filterExecutive")];
+    dropdowns.forEach(drop => {
+      names.forEach(name => {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        drop.appendChild(option.cloneNode(true));
+      });
+    });
+  }
+
+  function logVisit() {
+    const name = document.getElementById("employee").value;
+    const type = document.getElementById("visitType").value;
+    const time = document.getElementById("visitTime").value;
+
+    if (!name || !type || !time) {
+      alert("Please select all fields.");
+      return;
+    }
+
+    const formattedTime = time.replace(":", ".");
+
+    fetch("/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, visitType: type, visitTime: formattedTime })
+    })
+    .then(res => res.json())
+    .then(data => {
+  if (data.success) {
+    alert(`✅ Visit logged:\n${type}-${formattedTime} for ${name}`);
+    viewReport();
+  } else if (data.error === "Duplicate entry detected.") {
+    alert("⚠ This visit entry already exists.");
+  } else {
+    alert("❌ Failed to log visit.");
+  }
+})
+    .catch(err => alert("❌ Error: " + err));
+  }
+
+  function resetLogs() {
+    if (!confirm("⚠ Reset all visit logs? This will clear all TIME entries and counts.")) return;
+
+    fetch("/reset", { method: "POST" })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          alert("✅ Logs reset.");
+          viewReport();
+        } else {
+          alert("❌ Failed to reset logs.");
+        }
+      })
+      .catch(err => alert("❌ Error: " + err));
+  }
+
+  function applyFilters() {
+    const exec = document.getElementById("filterExecutive").value;
+    const type = document.getElementById("filterType").value;
+    const time = document.getElementById("filterTime").value;
+
+    let query = "?";
+    if (exec) query += `executive=${encodeURIComponent(exec)}&`;
+    if (type) query += `type=${type}&`;
+    if (time) query += `time=${time}&`;
+
+    viewReport(query);
+  }
+
+  function viewReport(query = "") {
+    fetch("/report" + query)
+      .then(res => res.json())
+      .then(data => {
+        const container = document.getElementById("reportTable");
+        container.innerHTML = "";
+
+        const table = document.createElement("table");
+        const header = document.createElement("tr");
+        data[0].forEach(cell => {
+          const th = document.createElement("th");
+          th.textContent = cell;
+          header.appendChild(th);
+        });
+        table.appendChild(header);
+
+        for (let i = 1; i < data.length; i++) {
+          const row = document.createElement("tr");
+          data[i].forEach(cell => {
+            const td = document.createElement("td");
+            td.textContent = cell ?? "";
+            row.appendChild(td);
+          });
+          table.appendChild(row);
+        }
+
+        container.appendChild(table);
+      });
+  }
+
+function downloadReport() {
+  window.open("/download-excel", "_blank");
+}
+
+  // Initialize
+  loadExecutives();
+  viewReport();
+  function addExecutive() {
+  const name = prompt("Enter new executive name:");
+  if (!name || name.trim() === "") return;
+
+  fetch("/add-executive", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: name.trim() })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert(`✅ Executive "${name}" added.`);
+      refreshExecutives();
+      viewReport();
+    } else {
+      alert("❌ Failed to add executive.");
+    }
+  });
+}
+
+function removeExecutive() {
+  const name = prompt("Enter executive name to remove:");
+  if (!name || name.trim() === "") return;
+
+  fetch("/remove-executive", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: name.trim() })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert(`✅ Executive "${name}" removed.`);
+      refreshExecutives();
+      viewReport();
+    } else {
+      alert("❌ Executive not found.");
+    }
+  });
+}
+
+function refreshExecutives() {
+  document.getElementById("employee").innerHTML = `<option value="" disabled selected>-- Select Executive --</option>`;
+  document.getElementById("filterExecutive").innerHTML = `<option value="">-- Filter by Executive --</option>`;
+  loadExecutives();
+}
+
+function updateTimestamp() {
+  const now = new Date();
+
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = now.getFullYear();
+
+  let hours = now.getHours();
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+
+  const formatted = `${day}/${month}/${year}, ${hours}:${minutes}:${seconds} ${ampm}`;
+  document.getElementById("timestamp").textContent =
+    `🕒 Current Date/Time: ${formatted}`;
+}
+
+setInterval(updateTimestamp, 1000);
+updateTimestamp();
+
+function createNewFile() {
+  if (!confirm("Start a new file for today? This will not affect existing files.")) return;
+
+  fetch("/new-file", { method: "POST" })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        alert(`✅ New file created: ${data.file}`);
+        location.reload(); // Reload to pick up new file
+      } else if (data.error === "File for today already exists.") {
+        alert("⚠ A file for today already exists.");
+      } else {
+        alert("❌ Failed to create new file.");
+      }
+    })
+    .catch(err => alert("❌ Error: " + err));
+}
+
+function openHistory() {
+  const win = window.open("", "_blank"); // Open new tab
+  win.document.write("<h2 style='font-family:Inter,sans-serif;'>📅 Last 7 Visit Logs</h2>");
+  win.document.write("<ul style='font-family:Inter,sans-serif;'>");
+
+  fetch("/history")
+    .then(res => res.json())
+    .then(files => {
+      files.forEach(file => {
+        const link = `/history/${file}`;
+        win.document.write(`<li><a href="${link}" target="_blank">${file}</a></li>`);
+      });
+      win.document.write("</ul>");
+    })
+    .catch(err => {
+      win.document.write("<p>Error loading history.</p>");
+    });
+}
+
+function toggleHistoryPanel() {
+  const panel = document.getElementById("historyPanel");
+  if (panel.style.display === "none") {
+    panel.style.display = "block";
+    loadHistoryPanel(); // Load files when shown
+  } else {
+    panel.style.display = "none";
+  }
+}
+
+function loadHistoryPanel() {
+  fetch("/history")
+    .then(res => res.json())
+    .then(files => {
+      const list = document.getElementById("historyList");
+      list.innerHTML = "";
+
+      files.forEach(file => {
+        const li = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = `/history/${file}`;
+        link.textContent = file;
+        link.style.color = "#0078D4";
+        link.style.textDecoration = "none";
+        link.style.fontWeight = "500";
+        link.target = "_blank"; // Optional: remove if you want inline download
+        li.appendChild(link);
+        list.appendChild(li);
+      });
+    })
+    .catch(err => {
+      document.getElementById("historyList").innerHTML = "<li>Error loading history.</li>";
+    });
+}
+
+function loadHistoryDropdown() {
+  fetch("/history")
+    .then(res => res.json())
+    .then(files => {
+      const dropdown = document.getElementById("historyDropdown");
+      dropdown.innerHTML = "";
+
+      files.forEach(file => {
+        const link = document.createElement("a");
+        link.href = `/report/${file}`; // ✅ Use the new report route
+        link.textContent = file;
+        link.target = "_blank"; // ✅ Opens in new tab
+        dropdown.appendChild(link);
+      });
+    });
+}
+
+loadHistoryDropdown(); // Call once on page load
+function toggleAdmin() {
+  const panel = document.getElementById("adminPanel");
+  panel.style.display = panel.style.display === "none" ? "block" : "none";
+}
+</script>
+</body>
+</html>

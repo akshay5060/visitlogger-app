@@ -1,0 +1,33 @@
+{
+  "name": "visitloggerapp",
+  "version": "1.0.0",
+  "description": "Executive Visit Logger Web App",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "visit",
+    "logger",
+    "excel",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google-cloud/storage": "^7.17.2",
+    "@supabase/supabase-js": "^2.76.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "exceljs": "^4.4.0",
+    "express": "^5.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/akshay5060/VisitLoggerApp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/akshay5060/VisitLoggerApp/issues"
+  },
+  "homepage": "https://github.com/akshay5060/VisitLoggerApp#readme"
+}
