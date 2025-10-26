@@ -379,11 +379,22 @@ button {
     </div>
   </div>
   <script>
-  async function loadExecutives() {
+
+async function loadExecutives() {
+  try {
     const res = await fetch("/executives");
     const names = await res.json();
-    const dropdowns = [document.getElementById("employee"), document.getElementById("filterExecutive")];
+    const dropdowns = [
+      document.getElementById("employee"),
+      document.getElementById("filterExecutive")
+    ];
     dropdowns.forEach(drop => {
+      drop.innerHTML = ""; // clear existing options
+      const defaultOption = drop === document.getElementById("employee")
+        ? "<option value='' disabled selected>-- Select Executive --</option>"
+        : "<option value=''>-- Filter by Executive --</option>";
+      drop.innerHTML = defaultOption;
+
       names.forEach(name => {
         const option = document.createElement("option");
         option.value = name;
@@ -391,7 +402,10 @@ button {
         drop.appendChild(option.cloneNode(true));
       });
     });
+  } catch (err) {
+    console.error("Error loading executives:", err);
   }
+}
 
   function logVisit() {
     const name = document.getElementById("employee").value;
@@ -631,23 +645,26 @@ function loadHistoryPanel() {
     });
 }
 
-function loadHistoryDropdown() {
-  fetch("/history")
-    .then(res => res.json())
-    .then(files => {
-      const dropdown = document.getElementById("historyDropdown");
-      dropdown.innerHTML = "";
+async function loadHistoryDropdown() {
+  try {
+    const res = await fetch("/history");
+    const files = await res.json();
+    const dropdown = document.getElementById("historyDropdown");
+    dropdown.innerHTML = "";
 
-      files.forEach(file => {
-        const link = document.createElement("a");
-        link.href = `/report/${file}`; // ✅ Use the new report route
-        link.textContent = file;
-        link.target = "_blank"; // ✅ Opens in new tab
-        dropdown.appendChild(link);
-      });
+    files.forEach(file => {
+      const a = document.createElement("a");
+      a.href = `/history/${file}`; // <- use /history route
+      a.textContent = file;
+      a.target = "_blank";
+      dropdown.appendChild(a);
     });
+  } catch (err) {
+    console.error("Error loading history files:", err);
+  }
 }
 
+loadExecutives();
 loadHistoryDropdown(); // Call once on page load
 function toggleAdmin() {
   const panel = document.getElementById("adminPanel");
