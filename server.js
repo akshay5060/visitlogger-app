@@ -2,7 +2,6 @@ require('dotenv').config();
 const express = require("express");
 const ExcelJS = require("exceljs");
 const { createClient } = require("@supabase/supabase-js");
-const path = require("path");
 
 const app = express();
 app.use(express.json());
@@ -45,48 +44,46 @@ async function deleteOldViewOnlyLogs(todayFilename) {
 }
 
 // ---------------------
-// Initialization
+// Get today filenames
+// ---------------------
+function getTodayFileNames() {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    fileName: `VisitLog_${today}.xlsx`,
+    viewName: `VisitLog_ViewOnly_${today}.xlsx`
+  };
+}
+
+// ---------------------
+// Initialize today's file if not exists
 // ---------------------
 async function initTodayFile() {
-  const today = new Date();
-  const dateStr = today.toISOString().slice(0, 10);
-  const fileName = `VisitLog_${dateStr}.xlsx`;
-  const viewName = `VisitLog_ViewOnly_${dateStr}.xlsx`;
-
+  const { fileName, viewName } = getTodayFileNames();
   try {
-    await downloadFile(fileName);
+    await downloadFile(fileName); // Already exists
   } catch {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Sheet2");
-
     sheet.addRow(["SNO", "EXECUTIVE", "VISIT TOOL UTILIZATION", "TOTAL", "TIME", "CD3", "CD5", "CD7", "YB", "MIS", "AFTERNOON"]);
     sheet.addRow(["TOTAL", "", "", 0, "", 0, 0, 0, 0, 0, 0]);
-
     const buffer = await workbook.xlsx.writeBuffer();
     await uploadFile(fileName, buffer);
     await uploadFile(viewName, buffer);
   }
-
-  return { fileName, viewName };
 }
 
-let TODAY_FILE, VIEW_FILE;
-initTodayFile().then(files => {
-  TODAY_FILE = files.fileName;
-  VIEW_FILE = files.viewName;
-});
+initTodayFile();
 
 // ---------------------
 // Routes
 // ---------------------
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "VisitLogger.html"));
-});
+
 // Log a visit
 app.post("/log", async (req, res) => {
   const { name, visitType, visitTime } = req.body;
   try {
-    const buffer = await downloadFile(TODAY_FILE);
+    const { fileName: todayFile, viewName: viewFile } = getTodayFileNames();
+    const buffer = await downloadFile(todayFile);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
     const sheet = workbook.getWorksheet("Sheet2");
@@ -142,7 +139,6 @@ app.post("/log", async (req, res) => {
       }
       return total;
     };
-
     totalRow.getCell(3).value = sum(3);
     totalRow.getCell(4).value = sum(4);
     totalRow.getCell(6).value = sum(6);
@@ -154,39 +150,8 @@ app.post("/log", async (req, res) => {
     totalRow.commit();
 
     const bufferUpdated = await workbook.xlsx.writeBuffer();
-    await uploadFile(TODAY_FILE, bufferUpdated);
-    await uploadFile(VIEW_FILE, bufferUpdated);
-
-    res.send({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({ error: err.message });
-  }
-});
-
-// Reset logs
-app.post("/reset", async (req, res) => {
-  try {
-    const buffer = await downloadFile(TODAY_FILE);
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
-    const sheet = workbook.getWorksheet("Sheet2");
-    const lastRow = sheet.lastRow.number;
-
-    for (let i = 2; i < lastRow; i++) {
-      const row = sheet.getRow(i);
-      for (let col = 3; col <= 11; col++) row.getCell(col).value = "";
-      row.getCell(5).value = "";
-      row.commit();
-    }
-
-    const totalRow = sheet.getRow(lastRow);
-    for (let col = 3; col <= 11; col++) totalRow.getCell(col).value = 0;
-    totalRow.commit();
-
-    const bufferUpdated = await workbook.xlsx.writeBuffer();
-    await uploadFile(TODAY_FILE, bufferUpdated);
-    await uploadFile(VIEW_FILE, bufferUpdated);
+    await uploadFile(todayFile, bufferUpdated);
+    await uploadFile(viewFile, bufferUpdated);
 
     res.send({ success: true });
   } catch (err) {
@@ -198,7 +163,8 @@ app.post("/reset", async (req, res) => {
 // Get executives
 app.get("/executives", async (req, res) => {
   try {
-    const buffer = await downloadFile(TODAY_FILE);
+    const { fileName: todayFile } = getTodayFileNames();
+    const buffer = await downloadFile(todayFile);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
     const sheet = workbook.getWorksheet("Sheet2");
@@ -218,178 +184,21 @@ app.get("/executives", async (req, res) => {
   }
 });
 
-// Add executive
-app.post("/add-executive", async (req, res) => {
-  const { name } = req.body;
-  if (!name) return res.status(400).send({ error: "Name required" });
-  try {
-    const buffer = await downloadFile(TODAY_FILE);
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
-    const sheet = workbook.getWorksheet("Sheet2");
-    const lastRow = sheet.lastRow.number;
-
-    sheet.insertRow(lastRow, [
-      lastRow - 1,
-      name.trim().toUpperCase(),
-      "", "", "", "", "", "", "", "", "", ""
-    ]);
-
-    for (let i = 2; i < lastRow; i++) {
-      sheet.getRow(i).getCell(1).value = i - 1;
-    }
-
-    const bufferUpdated = await workbook.xlsx.writeBuffer();
-    await uploadFile(TODAY_FILE, bufferUpdated);
-    await uploadFile(VIEW_FILE, bufferUpdated);
-
-    res.send({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({ error: err.message });
-  }
-});
-
-// Remove executive
-app.post("/remove-executive", async (req, res) => {
-  const { name } = req.body;
-  if (!name) return res.status(400).send({ error: "Name required" });
-  try {
-    const buffer = await downloadFile(TODAY_FILE);
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
-    const sheet = workbook.getWorksheet("Sheet2");
-    const lastRow = sheet.rowCount;
-    let found = false;
-    const target = name.trim().toUpperCase();
-
-    for (let i = 2; i <= lastRow; i++) {
-      const row = sheet.getRow(i);
-      const cellValue = row.getCell(2).value?.toString().trim().toUpperCase();
-      if (cellValue === target) {
-        const totalRow = sheet.getRow(lastRow);
-        for (let col = 3; col <= 11; col++) {
-          const execVal = parseInt(row.getCell(col).value || 0);
-          const totalVal = parseInt(totalRow.getCell(col).value || 0);
-          totalRow.getCell(col).value = totalVal - execVal;
-        }
-        sheet.spliceRows(i, 1);
-        found = true;
-        break;
-      }
-    }
-
-    if (!found) return res.status(404).send({ error: "Executive not found" });
-
-    for (let i = 2; i < sheet.rowCount; i++) {
-      sheet.getRow(i).getCell(1).value = i - 1;
-    }
-
-    const bufferUpdated = await workbook.xlsx.writeBuffer();
-    await uploadFile(TODAY_FILE, bufferUpdated);
-    await uploadFile(VIEW_FILE, bufferUpdated);
-
-    res.send({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({ error: err.message });
-  }
-});
-
-// New file (clone latest)
-app.post("/new-file", async (req, res) => {
-  try {
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10);
-    const newFileName = `VisitLog_${dateStr}.xlsx`;
-    const newViewFile = `VisitLog_ViewOnly_${dateStr}.xlsx`;
-
-    try {
-      await downloadFile(newFileName);
-      return res.status(400).send({ error: "File for today already exists." });
-    } catch {}
-
-    const { data: files } = await supabase.storage.from(BUCKET).list("", { limit: 100 });
-    const latestFile = files
-      .filter(f => f.name.startsWith("VisitLog_") && !f.name.includes("ViewOnly"))
-      .sort((a,b) => b.name.localeCompare(a.name))[0]?.name;
-
-    if (!latestFile) return res.status(500).send({ error: "No previous VisitLog file found to clone." });
-
-    const buffer = await downloadFile(latestFile);
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
-    const sheet = workbook.getWorksheet("Sheet2");
-    const lastRow = sheet.lastRow.number;
-
-    for (let i = 2; i < lastRow; i++) {
-      const row = sheet.getRow(i);
-      for (let col = 3; col <= 11; col++) row.getCell(col).value = "";
-      row.getCell(5).value = "";
-      row.commit();
-    }
-
-    const totalRow = sheet.getRow(lastRow);
-    for (let col = 3; col <= 11; col++) totalRow.getCell(col).value = 0;
-    totalRow.commit();
-
-    const bufferUpdated = await workbook.xlsx.writeBuffer();
-    await uploadFile(newFileName, bufferUpdated);
-    await uploadFile(newViewFile, bufferUpdated);
-
-    await deleteOldViewOnlyLogs(newViewFile);
-
-    res.send({ success: true, file: newFileName });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({ error: err.message });
-  }
-});
-
-// Serve view-only Excel
-app.get("/view-excel", async (req, res) => {
-  try {
-    const buffer = await downloadFile(VIEW_FILE);
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `inline; filename=${VIEW_FILE}`);
-    res.send(buffer);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({ error: err.message });
-  }
-});
-
-// Download Excel
-app.get("/download-excel", async (req, res) => {
-  try {
-    const buffer = await downloadFile(TODAY_FILE);
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename=Visit_Report.xlsx`);
-    res.send(buffer);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({ error: err.message });
-  }
-});
-
-// History (last 7 files)
-app.get("/history", async (req, res) => {
-  try {
-    const { data: files } = await supabase.storage.from(BUCKET).list("", { limit: 100 });
-    const historyFiles = files
-      .filter(f => f.name.startsWith("VisitLog_") && !f.name.includes("ViewOnly"))
-      .sort((a,b) => b.name.localeCompare(a.name))
-      .slice(0,7)
-      .map(f => f.name);
-    res.json(historyFiles);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({ error: err.message });
-  }
-});
-
-// History file view
+// History and report routes
 app.get("/history/:filename", async (req, res) => {
+  try {
+    const buffer = await downloadFile(req.params.filename);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `inline; filename=${req.params.filename}`);
+    res.send(buffer);
+  } catch (err) {
+    console.error(err);
+    res.status(404).send("File not found");
+  }
+});
+
+// Add alias route for /report/:filename
+app.get("/report/:filename", async (req, res) => {
   try {
     const buffer = await downloadFile(req.params.filename);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
