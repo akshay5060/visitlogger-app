@@ -79,7 +79,9 @@ initTodayFile().then(files => {
 // ---------------------
 // Routes
 // ---------------------
-
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "VisitLogger.html"));
+});
 // Log a visit
 app.post("/log", async (req, res) => {
   const { name, visitType, visitTime } = req.body;
