@@ -1,50 +1,40 @@
+require('dotenv').config();
 const express = require("express");
 const ExcelJS = require("exceljs");
-const path = require("path");
 const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
 app.use(express.json());
 
+// ---------------------
+// Supabase setup
+// ---------------------
 const supabase = createClient(
-  "https://jjsotbdvooeksoceulbz.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impqc290YmR2b29la3NvY2V1bGJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE0MDg2ODcsImV4cCI6MjA3Njk4NDY4N30.eZ9bFwCOfpYHdSD_ko-jaR0H28T6u-CnDbJ5BKTCRuk"
+  process.env.SUPABASE_URL,        // Supabase URL
+  process.env.SUPABASE_SERVICE_KEY // Service role key
 );
-const BUCKET = "visit-logs"; // Change to your Supabase bucket name
+const BUCKET = "visit-logs";       // Supabase bucket name
 
+// ---------------------
 // Helper functions
-async function downloadFile(filename) {
-  const { data, error } = await supabase.storage.from(BUCKET).download(filename);
-  if (error) return null;
-  return Buffer.from(await data.arrayBuffer());
-}
+// ---------------------
 
-async function uploadFile(filename, buffer) {
-  const { error } = await supabase.storage.from(BUCKET).upload(filename, buffer, { upsert: true });
+async function uploadFile(fileName, buffer) {
+  const { error } = await supabase.storage.from(BUCKET).upload(fileName, buffer, { upsert: true });
   if (error) throw error;
 }
 
-async function loadWorkbook(filename) {
-  const buffer = await downloadFile(filename);
-  const workbook = new ExcelJS.Workbook();
-  if (buffer) {
-    await workbook.xlsx.load(buffer);
-  } else {
-    const sheet = workbook.addWorksheet("Sheet2");
-    sheet.addRow(["SNO", "EXECUTIVE", "VISIT TOOL UTILIZATION", "TOTAL", "TIME", "CD3", "CD5", "CD7", "YB", "MIS", "AFTERNOON"]);
-    sheet.addRow(["TOTAL", "", "", 0, "", 0, 0, 0, 0, 0, 0]);
-  }
-  return workbook;
+async function downloadFile(fileName) {
+  const { data, error } = await supabase.storage.from(BUCKET).download(fileName);
+  if (error) throw error;
+  return Buffer.from(await data.arrayBuffer());
 }
 
-async function saveWorkbook(workbook, filename) {
-  const buffer = await workbook.xlsx.writeBuffer();
-  await uploadFile(filename, buffer);
-}
-
-// Delete old view-only files
 async function deleteOldViewOnlyLogs(todayFilename) {
-  const { data: files } = await supabase.storage.from(BUCKET).list();
+  const { data: files, error } = await supabase.storage.from(BUCKET).list("", { limit: 100 });
+  if (error) console.error("Error listing files:", error);
+  if (!files) return;
+
   for (const file of files) {
     const isViewOnly = /^VisitLog_ViewOnly_\d{4}-\d{2}-\d{2}\.xlsx$/.test(file.name);
     if (isViewOnly && file.name !== todayFilename) {
@@ -54,26 +44,49 @@ async function deleteOldViewOnlyLogs(todayFilename) {
   }
 }
 
-// Daily filenames
-const today = new Date();
-const dateStr = today.toISOString().slice(0, 10);
-const fileName = `VisitLog_${dateStr}.xlsx`;
-const viewFileName = `VisitLog_ViewOnly_${dateStr}.xlsx`;
+// ---------------------
+// Initialization
+// ---------------------
+async function initTodayFile() {
+  const today = new Date();
+  const dateStr = today.toISOString().slice(0, 10);
+  const fileName = `VisitLog_${dateStr}.xlsx`;
+  const viewName = `VisitLog_ViewOnly_${dateStr}.xlsx`;
 
-// Ensure today's file exists
-(async () => {
-  const workbook = await loadWorkbook(fileName);
-  await saveWorkbook(workbook, fileName);
-  await saveWorkbook(workbook, viewFileName);
-})();
+  try {
+    await downloadFile(fileName);
+  } catch {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Sheet2");
 
-// --------------------- ROUTES ---------------------
+    sheet.addRow(["SNO", "EXECUTIVE", "VISIT TOOL UTILIZATION", "TOTAL", "TIME", "CD3", "CD5", "CD7", "YB", "MIS", "AFTERNOON"]);
+    sheet.addRow(["TOTAL", "", "", 0, "", 0, 0, 0, 0, 0, 0]);
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    await uploadFile(fileName, buffer);
+    await uploadFile(viewName, buffer);
+  }
+
+  return { fileName, viewName };
+}
+
+let TODAY_FILE, VIEW_FILE;
+initTodayFile().then(files => {
+  TODAY_FILE = files.fileName;
+  VIEW_FILE = files.viewName;
+});
+
+// ---------------------
+// Routes
+// ---------------------
 
 // Log a visit
 app.post("/log", async (req, res) => {
+  const { name, visitType, visitTime } = req.body;
   try {
-    const { name, visitType, visitTime } = req.body;
-    const workbook = await loadWorkbook(fileName);
+    const buffer = await downloadFile(TODAY_FILE);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
     const sheet = workbook.getWorksheet("Sheet2");
     if (!sheet) return res.status(404).send("Sheet2 not found");
 
@@ -86,7 +99,6 @@ app.post("/log", async (req, res) => {
         break;
       }
     }
-
     if (!executiveRow) return res.status(404).send({ error: "Executive not found" });
 
     const timeCell = executiveRow.getCell(5);
@@ -94,9 +106,10 @@ app.post("/log", async (req, res) => {
     const existingTime = timeCell.value ? timeCell.value.toString() : "";
     if (existingTime.includes(newEntry)) return res.status(400).send({ error: "Duplicate entry detected." });
 
-    timeCell.value = existingTime ? `${existingTime}/${newEntry}` : newEntry;
+    const updatedTime = existingTime ? `${existingTime}/${newEntry}` : newEntry;
+    timeCell.value = updatedTime;
 
-    const visits = timeCell.value.split("/").map(v => {
+    const visits = updatedTime.split("/").map(v => {
       const [type, time] = v.split("-");
       return { type: type.toUpperCase(), time: parseFloat(time) };
     });
@@ -104,16 +117,17 @@ app.post("/log", async (req, res) => {
     const totalVisit = visits.length;
     const visitTillAfternoon = visits.filter(v => v.time < 12).length;
     const visitAfterAfternoon = visits.filter(v => v.time >= 12).length;
-    const typeCounts = { CD3: 0, CD5: 0, CD7: 0, YB: 0, MIS: 0 };
+
+    const typeCounts = { "CD3": 0, "CD5": 0, "CD7": 0, "YB": 0, "MIS": 0 };
     visits.forEach(v => { if (typeCounts[v.type] !== undefined) typeCounts[v.type]++; });
 
     executiveRow.getCell(3).value = visitTillAfternoon;
     executiveRow.getCell(4).value = totalVisit;
-    executiveRow.getCell(6).value = typeCounts.CD3;
-    executiveRow.getCell(7).value = typeCounts.CD5;
-    executiveRow.getCell(8).value = typeCounts.CD7;
-    executiveRow.getCell(9).value = typeCounts.YB;
-    executiveRow.getCell(10).value = typeCounts.MIS;
+    executiveRow.getCell(6).value = typeCounts["CD3"];
+    executiveRow.getCell(7).value = typeCounts["CD5"];
+    executiveRow.getCell(8).value = typeCounts["CD7"];
+    executiveRow.getCell(9).value = typeCounts["YB"];
+    executiveRow.getCell(10).value = typeCounts["MIS"];
     executiveRow.getCell(11).value = visitAfterAfternoon;
     executiveRow.commit();
 
@@ -126,60 +140,39 @@ app.post("/log", async (req, res) => {
       }
       return total;
     };
-    [3,4,6,7,8,9,10,11].forEach(col => totalRow.getCell(col).value = sum(col));
+
+    totalRow.getCell(3).value = sum(3);
+    totalRow.getCell(4).value = sum(4);
+    totalRow.getCell(6).value = sum(6);
+    totalRow.getCell(7).value = sum(7);
+    totalRow.getCell(8).value = sum(8);
+    totalRow.getCell(9).value = sum(9);
+    totalRow.getCell(10).value = sum(10);
+    totalRow.getCell(11).value = sum(11);
     totalRow.commit();
 
-    await saveWorkbook(workbook, fileName);
-    await saveWorkbook(workbook, viewFileName);
+    const bufferUpdated = await workbook.xlsx.writeBuffer();
+    await uploadFile(TODAY_FILE, bufferUpdated);
+    await uploadFile(VIEW_FILE, bufferUpdated);
 
     res.send({ success: true });
   } catch (err) {
     console.error(err);
-    res.status(500).send({ error: "Internal server error" });
+    res.status(500).send({ error: err.message });
   }
 });
 
-// View report (with filters)
-app.get("/report", async (req, res) => {
-  try {
-    const { executive, type, time } = req.query;
-    const workbook = await loadWorkbook(fileName);
-    const sheet = workbook.getWorksheet("Sheet2");
-
-    const data = [];
-    const headers = sheet.getRow(1).values.slice(1);
-    data.push(headers);
-
-    const lastRow = sheet.lastRow.number;
-    for (let i = 2; i <= lastRow; i++) {
-      const row = sheet.getRow(i);
-      const name = row.getCell(2).value?.toString().trim();
-      const timeString = row.getCell(5).value?.toString().trim() || "";
-
-      if (name === "" && row.getCell(1).value?.toString().trim().toUpperCase() === "TOTAL") continue;
-      if (executive && name?.toUpperCase() !== executive.toUpperCase()) continue;
-      if (type && !timeString.includes(type.toUpperCase())) continue;
-
-      if (time === "morning" && !timeString.split("/").some(v => parseFloat(v.split("-")[1]) < 12)) continue;
-      if (time === "afternoon" && !timeString.split("/").some(v => parseFloat(v.split("-")[1]) >= 12)) continue;
-
-      data.push(row.values.slice(1));
-    }
-
-    res.json(data);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({ error: "Internal server error" });
-  }
-});
-
+// ---------------------
 // Reset logs
+// ---------------------
 app.post("/reset", async (req, res) => {
   try {
-    const workbook = await loadWorkbook(fileName);
+    const buffer = await downloadFile(TODAY_FILE);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
     const sheet = workbook.getWorksheet("Sheet2");
-
     const lastRow = sheet.lastRow.number;
+
     for (let i = 2; i < lastRow; i++) {
       const row = sheet.getRow(i);
       for (let col = 3; col <= 11; col++) row.getCell(col).value = "";
@@ -191,19 +184,25 @@ app.post("/reset", async (req, res) => {
     for (let col = 3; col <= 11; col++) totalRow.getCell(col).value = 0;
     totalRow.commit();
 
-    await saveWorkbook(workbook, fileName);
-    await saveWorkbook(workbook, viewFileName);
+    const bufferUpdated = await workbook.xlsx.writeBuffer();
+    await uploadFile(TODAY_FILE, bufferUpdated);
+    await uploadFile(VIEW_FILE, bufferUpdated);
+
     res.send({ success: true });
   } catch (err) {
     console.error(err);
-    res.status(500).send({ error: "Internal server error" });
+    res.status(500).send({ error: err.message });
   }
 });
 
-// Get executive list
+// ---------------------
+// Get executives
+// ---------------------
 app.get("/executives", async (req, res) => {
   try {
-    const workbook = await loadWorkbook(fileName);
+    const buffer = await downloadFile(TODAY_FILE);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
     const sheet = workbook.getWorksheet("Sheet2");
 
     const names = [];
@@ -217,15 +216,60 @@ app.get("/executives", async (req, res) => {
     res.json(names);
   } catch (err) {
     console.error(err);
-    res.status(500).send({ error: "Internal server error" });
+    res.status(500).send({ error: err.message });
   }
 });
 
-// -----------------------
-// The rest of your routes
-// `/new-file`, `/add-executive`, `/remove-executive`, `/history`, `/view-excel`, `/download-excel`, `/report/:filename`
-// Can all be adapted in the same way using loadWorkbook() and saveWorkbook() instead of fs.
-// -----------------------
+// ---------------------
+// Serve view-only Excel
+// ---------------------
+app.get("/view-excel", async (req, res) => {
+  try {
+    const buffer = await downloadFile(VIEW_FILE);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `inline; filename=${VIEW_FILE}`);
+    res.send(buffer);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ error: err.message });
+  }
+});
 
+// ---------------------
+// Download Excel
+// ---------------------
+app.get("/download-excel", async (req, res) => {
+  try {
+    const buffer = await downloadFile(TODAY_FILE);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename=Visit_Report.xlsx`);
+    res.send(buffer);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ error: err.message });
+  }
+});
+
+// ---------------------
+// History (last 7 files)
+// ---------------------
+app.get("/history", async (req, res) => {
+  try {
+    const { data: files, error } = await supabase.storage.from(BUCKET).list("", { limit: 100 });
+    if (error) throw error;
+    const historyFiles = files
+      .filter(f => f.name.startsWith("VisitLog_") && !f.name.includes("ViewOnly"))
+      .sort((a,b) => b.name.localeCompare(a.name))
+      .slice(0,7)
+      .map(f => f.name);
+    res.json(historyFiles);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ error: err.message });
+  }
+});
+
+// ---------------------
 // Start server
+// ---------------------
 app.listen(3000, () => console.log("✅ Server running at http://localhost:3000"));
