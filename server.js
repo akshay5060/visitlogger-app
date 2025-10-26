@@ -2,7 +2,8 @@ const express = require("express");
 const ExcelJS = require("exceljs");
 const path = require("path");
 const fs = require("fs");
-
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient('https://jjsotbdvooeksoceulbz.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impqc290YmR2b29la3NvY2V1bGJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE0MDg2ODcsImV4cCI6MjA3Njk4NDY4N30.eZ9bFwCOfpYHdSD_ko-jaR0H28T6u-CnDbJ5BKTCRuk');
 const app = express();
 app.use(express.json());
 app.use(express.static(__dirname));
@@ -519,6 +520,23 @@ app.get("/report/:filename", async (req, res) => {
 
   res.send(html);
 });
+// Upload file
+async function uploadFile(fileName, buffer) {
+  const { data, error } = await supabase
+    .storage
+    .from('visitlogs')
+    .upload(fileName, buffer, { upsert: true });
+  if (error) console.error(error);
+}
 
+// Download file
+async function downloadFile(fileName) {
+  const { data, error } = await supabase
+    .storage
+    .from('visitlogs')
+    .download(fileName);
+  if (error) throw error;
+  return data.arrayBuffer(); // convert to buffer
+}
 // Start server
 app.listen(3000, () => console.log("✅ Server running at http://localhost:3000"));
