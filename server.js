@@ -382,4 +382,23 @@ app.post("/reset", async (req, res) => {
   }
 });
 
+app.get("/download-excel", async (req, res) => {
+  try {
+    const { fileName } = getTodayFileNames();
+    // Do NOT do extra ExcelJS save, just stream the stored file
+    const buffer = await downloadFile(fileName);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=Visit_Report.xlsx"
+    );
+    res.send(buffer);
+  } catch (err) {
+    res.status(500).send("Failed to download Excel: " + err.message);
+  }
+});
+
 app.listen(3000, () => console.log("✅ Server running at http://localhost:3000"));
