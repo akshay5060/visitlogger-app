@@ -230,19 +230,54 @@ app.get("/report/:filename", async (req, res) => {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
     const sheet = workbook.getWorksheet("Sheet2");
-    if (!sheet) return res.json([]);
 
-    let data = [];
-    sheet.eachRow((row) => {
-      data.push(row.values.slice(1)); // skip empty first cell
+    if (!sheet) return res.status(404).send("Sheet2 not found");
+
+    let html = `
+      <html>
+      <head>
+        <title>Visit Report - ${filename}</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f8; padding: 20px; color: #333; }
+          table { width: 100%; border-collapse: collapse; font-size: 14px; }
+          th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+          th { background-color: #0078D4; color: white; font-weight: 600; position: sticky; top: 0; }
+          h1 { color: #0078D4; }
+        </style>
+      </head>
+      <body>
+        <h1>Visit Report: ${filename}</h1>
+        <table><thead><tr>`;
+
+    // Add headers
+    const headerRow = sheet.getRow(1);
+    for (let i = 1; i <= headerRow.cellCount; i++) {
+      html += `<th>${headerRow.getCell(i).value || ""}</th>`;
+    }
+    html += `</tr></thead><tbody>`;
+
+    // Add rows except TOTAL row
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // Skip header
+      const nameCell = row.getCell(2)?.value;
+      if (nameCell && nameCell.toString().toUpperCase().includes("TOTAL")) return; // Skip total
+
+      html += "<tr>";
+      for (let i = 1; i <= headerRow.cellCount; i++) {
+        html += `<td>${row.getCell(i).value || ""}</td>`;
+      }
+      html += "</tr>";
     });
 
-    res.json(data);
+    html += "</tbody></table></body></html>";
+    res.send(html);
+
   } catch (err) {
     console.error(err);
-    res.status(404).json({ error: "File not found or invalid format" });
+    res.status(500).send("Error generating report.");
   }
 });
+
 
 // Recalculate total for filtered report
 app.get("/report", async (req, res) => {
