@@ -257,5 +257,33 @@ app.get("/report", async (req, res) => {
     res.json([]);
   }
 });
+// Reset today's sheet (clear all data except headers and executive names)
+app.post("/reset", async (req, res) => {
+  try {
+    const { fileName, viewName } = getTodayFileNames();
+    const buffer = await downloadFile(fileName);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const sheet = workbook.getWorksheet("Sheet2");
+    if (!sheet) return res.status(404).send("Sheet2 not found");
+
+    // Clear all time/visit columns (C to K)
+    sheet.eachRow((row, rowNum) => {
+      if (rowNum > 1 && row.getCell(2).value?.toString().toUpperCase() !== "TOTAL") {
+        for (let col = 3; col <= 11; col++) {
+          row.getCell(col).value = col === 2 ? row.getCell(col).value : null;
+        }
+      }
+    });
+
+    const bufferUpdated = await workbook.xlsx.writeBuffer();
+    await uploadFile(fileName, bufferUpdated);
+    await uploadFile(viewName, bufferUpdated);
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).send({ error: err.message });
+  }
+});
 
 app.listen(3000, () => console.log("✅ Server running at http://localhost:3000"));
