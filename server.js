@@ -216,15 +216,26 @@ app.get("/history", async (req, res) => {
     res.json([]);
   }
 });
-app.get("/history/:filename", async (req, res) => {
+// View report for any past file
+app.get("/report/:filename", async (req, res) => {
   try {
     const filename = req.params.filename;
     const buffer = await downloadFile(filename);
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `inline; filename=${filename}`);
-    res.send(buffer);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const sheet = workbook.getWorksheet("Sheet2");
+
+    if (!sheet) return res.json([]);
+
+    let data = [];
+    sheet.eachRow((row) => {
+      data.push(row.values.slice(1)); // skip empty first value
+    });
+
+    res.json(data);
   } catch (err) {
-    res.status(404).send("File not found");
+    console.error(err);
+    res.status(404).json({ error: "File not found or invalid format" });
   }
 });
 // Recalculate total for filtered report
