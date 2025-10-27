@@ -239,9 +239,23 @@ app.get("/report/:filename", async (req, res) => {
         <title>Visit Report - ${filename}</title>
         <style>
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f8; padding: 20px; color: #333; }
-          table { width: 100%; border-collapse: collapse; font-size: 14px; }
-          th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-          th { background-color: #0078D4; color: white; font-weight: 600; position: sticky; top: 0; }
+          table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: auto; }
+          th, td {
+            border: 1px solid #ccc;
+            padding: 4px 8px;
+            text-align: center;
+            max-width: 120px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          th {
+            background-color: #0078D4;
+            color: white;
+            font-weight: 600;
+            font-size: 13px;
+            padding: 4px 8px;
+          }
           h1 { color: #0078D4; }
         </style>
       </head>
@@ -277,6 +291,7 @@ app.get("/report/:filename", async (req, res) => {
     res.status(500).send("Error generating report.");
   }
 });
+
 
 
 // Recalculate total for filtered report
