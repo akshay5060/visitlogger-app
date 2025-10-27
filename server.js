@@ -216,7 +216,17 @@ app.get("/history", async (req, res) => {
     res.json([]);
   }
 });
-
+app.get("/history/:filename", async (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const buffer = await downloadFile(filename);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `inline; filename=${filename}`);
+    res.send(buffer);
+  } catch (err) {
+    res.status(404).send("File not found");
+  }
+});
 // Recalculate total for filtered report
 app.get("/report", async (req, res) => {
   try {
