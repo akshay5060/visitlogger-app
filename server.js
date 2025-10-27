@@ -24,7 +24,7 @@ async function downloadFile(fileName) {
   return Buffer.from(await data.arrayBuffer());
 }
 
-// Clone base file (VisitLog.xlsx) preserving Sheet2 data & formatting
+// Clone base file (VisitLog.xlsx) preserving Sheet2 data & formatting including styles
 async function cloneBaseFile() {
   try {
     const baseFile = "VisitLog.xlsx";
@@ -42,12 +42,18 @@ async function cloneBaseFile() {
     const newWorkbook = new ExcelJS.Workbook();
     const newSheet = newWorkbook.addWorksheet("Sheet2");
 
-    baseSheet.eachRow({ includeEmpty: true }, (row, rowNum) => {
-      const newRow = [];
-      row.eachCell({ includeEmpty: true }, (cell) => {
-        newRow.push(cell.value);
+    baseSheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+      const newRow = newSheet.getRow(rowNumber);
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        const newCell = newRow.getCell(colNumber);
+        newCell.value = cell.value;
+
+        // Deep copy styles (font, fill, border, alignment, etc.)
+        if (cell.style) {
+          newCell.style = JSON.parse(JSON.stringify(cell.style));
+        }
       });
-      newSheet.addRow(newRow);
+      newRow.commit();
     });
 
     return newWorkbook;
@@ -181,9 +187,9 @@ app.post("/log", async (req, res) => {
   }
 });
 
-// Add, Remove, Reset — remain same (no change needed)
+// Add, Remove, Reset, and New-file endpoints unchanged (use your current versions)
 
-// Create new file for today (fix: clone base file)
+// New-file endpoint (clone base file)
 app.post("/new-file", async (req, res) => {
   const { fileName, viewName } = getTodayFileNames();
   try {
@@ -201,7 +207,7 @@ app.post("/new-file", async (req, res) => {
   }
 });
 
-// Fix: Supabase list destructuring
+// List last 7 files for history dropdown
 app.get("/history", async (req, res) => {
   try {
     const { data: files, error } = await supabase.storage.from(BUCKET).list("", { limit: 30 });
@@ -216,7 +222,8 @@ app.get("/history", async (req, res) => {
     res.json([]);
   }
 });
-// View report for any past file
+
+// Serve file content as JSON for past file report for use in UI table rendering
 app.get("/report/:filename", async (req, res) => {
   try {
     const filename = req.params.filename;
@@ -224,12 +231,11 @@ app.get("/report/:filename", async (req, res) => {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
     const sheet = workbook.getWorksheet("Sheet2");
-
     if (!sheet) return res.json([]);
 
     let data = [];
     sheet.eachRow((row) => {
-      data.push(row.values.slice(1)); // skip empty first value
+      data.push(row.values.slice(1)); // skip empty first cell
     });
 
     res.json(data);
@@ -238,6 +244,7 @@ app.get("/report/:filename", async (req, res) => {
     res.status(404).json({ error: "File not found or invalid format" });
   }
 });
+
 // Recalculate total for filtered report
 app.get("/report", async (req, res) => {
   try {
@@ -262,7 +269,7 @@ app.get("/report", async (req, res) => {
     else if (time === "afternoon")
       rows = rows.filter(r => typeof r[4] === "string" && r[4].split("/").some(e => parseFloat(e.split("-")[1]) >= 12));
 
-    // Fix: recalc totals
+    // Recalculate totals for filtered rows
     const totals = new Array(data[0].length).fill("");
     totals[0] = "TOTAL";
     for (let i = 0; i < rows.length; i++) {
@@ -278,7 +285,8 @@ app.get("/report", async (req, res) => {
     res.json([]);
   }
 });
-// Reset today's sheet (clear all data except headers and executive names)
+
+// Reset today's sheet clearing data but keeping headers and executive names
 app.post("/reset", async (req, res) => {
   try {
     const { fileName, viewName } = getTodayFileNames();
@@ -288,7 +296,7 @@ app.post("/reset", async (req, res) => {
     const sheet = workbook.getWorksheet("Sheet2");
     if (!sheet) return res.status(404).send("Sheet2 not found");
 
-    // Clear all time/visit columns (C to K)
+    // Clear columns C (3) to K (11) except headers and "TOTAL" row
     sheet.eachRow((row, rowNum) => {
       if (rowNum > 1 && row.getCell(2).value?.toString().toUpperCase() !== "TOTAL") {
         for (let col = 3; col <= 11; col++) {
