@@ -239,6 +239,22 @@ app.get("/report/:filename", async (req, res) => {
         <title>Visit Report - ${filename}</title>
         <style>
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f8; padding: 20px; color: #333; }
+          .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+          }
+          .btn {
+            background: #0078D4;
+            color: white;
+            padding: 7px 14px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+          }
           table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: auto; }
           th, td {
             border: 1px solid #ccc;
@@ -260,7 +276,10 @@ app.get("/report/:filename", async (req, res) => {
         </style>
       </head>
       <body>
-        <h1>Visit Report: ${filename}</h1>
+        <div class="top-bar">
+          <h1>Visit Report: ${filename}</h1>
+          <button class="btn" onclick="window.print()">🖨️ Print</button>
+        </div>
         <table><thead><tr>`;
 
     // Add headers
@@ -272,9 +291,9 @@ app.get("/report/:filename", async (req, res) => {
 
     // Add rows except TOTAL row
     sheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return; // Skip header
+      if (rowNumber === 1) return;
       const nameCell = row.getCell(2)?.value;
-      if (nameCell && nameCell.toString().toUpperCase().includes("TOTAL")) return; // Skip total
+      if (nameCell && nameCell.toString().toUpperCase().includes("TOTAL")) return;
 
       html += "<tr>";
       for (let i = 1; i <= headerRow.cellCount; i++) {
@@ -291,7 +310,6 @@ app.get("/report/:filename", async (req, res) => {
     res.status(500).send("Error generating report.");
   }
 });
-
 
 
 // Recalculate total for filtered report
