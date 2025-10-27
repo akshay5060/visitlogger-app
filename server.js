@@ -63,6 +63,25 @@ async function cloneBaseFile() {
       });
       newRow.commit();
     });
+    // After all row/cell copying
+const sheetColumns = [
+  12,  // SR NO
+  22,  // EXECUTIVE NAME
+  18,  // VISIT TILL AFTERNOON
+  14,  // TOTAL VISIT
+  30,  // TIME
+  8,   // CD3
+  8,   // CD5
+  8,   // CD7
+  8,   // YB
+  8,   // MIS
+  24   // VISIT DONE AFTER AFTERNOON
+];
+sheetColumns.forEach((width, i) => {
+  newSheet.getColumn(i + 1).width = width;
+});
+return newWorkbook;
+
     return newWorkbook;
   } catch (err) {
     // fallback for missing base file...
