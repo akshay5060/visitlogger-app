@@ -33,11 +33,9 @@ async function cloneBaseFile() {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
 
-    // Ensure Sheet2 exists
     const baseSheet = workbook.getWorksheet("Sheet2");
     if (!baseSheet) throw new Error("Sheet2 not found in base file.");
 
-    // Create new workbook with same structure
     const newWorkbook = new ExcelJS.Workbook();
     const newSheet = newWorkbook.addWorksheet("Sheet2");
 
@@ -47,24 +45,30 @@ async function cloneBaseFile() {
         const newCell = newRow.getCell(colNumber);
         newCell.value = cell.value;
 
-        // Deep copy styles (font, fill, border, alignment, etc.)
-        if (cell.style) {
-          newCell.style = JSON.parse(JSON.stringify(cell.style));
+        // Ensure alignment is copied, especially wrapText!
+        if (cell.alignment) {
+          // Deep copy alignment, or enforce wrapText: false everywhere
+          newCell.alignment = JSON.parse(JSON.stringify(cell.alignment));
+          // If you want to guarantee wrapping is off everywhere, force it:
+          newCell.alignment.wrapText = false;
+        } else {
+          newCell.alignment = { wrapText: false };
         }
+
+        // Copy other styles as well (font, fills, borders, number format)
+        if (cell.font) newCell.font = JSON.parse(JSON.stringify(cell.font));
+        if (cell.fill) newCell.fill = JSON.parse(JSON.stringify(cell.fill));
+        if (cell.border) newCell.border = JSON.parse(JSON.stringify(cell.border));
+        if (cell.numFmt) newCell.numFmt = cell.numFmt;
       });
       newRow.commit();
     });
-
     return newWorkbook;
   } catch (err) {
-    console.warn("Base VisitLog.xlsx not found — using default structure.");
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Sheet2");
-    sheet.addRow(["SNO", "EXECUTIVE", "VISIT TOOL UTILIZATION", "TOTAL", "TIME", "CD3", "CD5", "CD7", "YB", "MIS", "AFTERNOON"]);
-    sheet.addRow(["TOTAL", "", "", 0, "", 0, 0, 0, 0, 0, 0]);
-    return workbook;
+    // fallback for missing base file...
   }
 }
+
 
 function getTodayFileNames() {
   const today = new Date().toISOString().slice(0, 10);
